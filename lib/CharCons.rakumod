@@ -499,7 +499,9 @@ class Orthogone is export {
             $line.draw;
         }
         $!objcolor._;
+        gotoxy(1,1);
       }
+
     method fill {
         for 1 ..  @!concaves_points.end  -> $n {
            my $pt := @!concaves_points[$n];
