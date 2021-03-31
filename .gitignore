@@ -1,0 +1,8 @@
+
+.*.swp
+.*.*.swp
+lib/.precomp/
+exoslib/.precomp/
+trylib/.precomp/
+custom_libs/
+
