@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 
 
 1. Fix your RAKULIB env variable or any other setting so that raku can access your lib/ directory
@@ -22,4 +21,3 @@ The goal is now to get the list of rectangles in order to feel them.
 
 =======
 # Orthogon
->>>>>>> 9271fcd2f81830cfcea11e39f79b18b0e20118af
