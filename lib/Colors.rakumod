@@ -190,10 +190,9 @@ class Color is export {
         $chaine ~= "\n";
         return $print($chaine);
     }
-
-
     method _($str = False) {
        my $print = ($str == False) ?? &printf !! &sprintf;
+       $!current_li = False;
         return $print(chr(27) ~ "[0m");
     }
 }

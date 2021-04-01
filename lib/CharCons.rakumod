@@ -145,6 +145,9 @@ class Line is export {
     method get_coords() {
         return $!a.x,$!a.y,$!b.x,$!b.y;
     }
+    method str(--> Str) {
+        return $!a.x.Str ~ ',' ~ $!a.y.Str ~ '/' ~ $!b.x.Str ~ ',' ~ $!b.y.Str;
+    }
 
     method draw {
         my Int $n;
@@ -164,20 +167,21 @@ class Line is export {
 
 class Orthogone is export {
     
-    has Line @!lines;
     has @!coordonnees;
     has Int $!int_border_motif; 
     has Str $.border_motif; 
-    has Str ($!border_color_attr,$!fill_color_attr,$!mycolor);
+    has Str ($!border_color_attr,$!fill_color_attr);
     has Point  @.corner_points; 
     has Color $!objcolor; 
     has Point @!concaves_points;
     has Line @!vertical_diagonales;
     has Line @!horizontal_diagonales;
+    #---------------
+    has Line @!lines;
     has Line @!mis_diagonales;
+    has Line @!complete_rectangles;
+    #--------------
     has Int $!rotation;
-    has (@!v_indices,@!h_indices);
-    has @!rectangles;
     has ScreenBuffer $.scrn;
 
     has $!log_fh;
@@ -197,7 +201,6 @@ class Orthogone is export {
       $!scrn = ScreenBuffer.new;
       $!border_color_attr = $!objcolor.sequence8(LWHITE+BBLUE,str => True);
       $!fill_color_attr = $!objcolor.sequence8(LYELLOW,str => True);
-      $!mycolor = $!objcolor.sequence8(LYELLOW+BRED,str => True);
       @!corner_points := self.control_and_get(@!coordonnees);
       push @!lines,Line.new(a => @!corner_points[0], b => @!corner_points[1],border_motif => $!border_motif);
       $!scrn.load_value(@!corner_points[0]);
@@ -416,13 +419,13 @@ class Orthogone is export {
                     my Point $other_point := $!scrn.for_xrange_aty($pt.y,$pt.x); 
                     $other_point.setflag('RECTANGLE');
                     $pt.rect = $other_point;
-                    Line.new($pt,$other_point,motif => '*').draw;
+                    push @!complete_rectangles, Line.new($pt,$other_point,motif => '*');
                 }
                 when / (^ left ) | (right $) /  {
                     my Point $other_point := $!scrn.for_xrange_aty($pt.y,$pt.x,sens => -1);
                     $other_point.setflag('RECTANGLE');
                     $pt.rect = $other_point;
-                    Line.new($pt,$other_point,motif => '∘').draw;
+                    push @!complete_rectangles, Line.new($pt,$other_point,motif => '∘');
                 }
                default { 
                    $!log_fh.say("Angle: '", $pt.direction , ' not defined or wrong.');
@@ -488,33 +491,36 @@ class Orthogone is export {
              #print( $pt.direction );
              printf("%d,%d",$pt.x,$pt.y)# if $pt.direction eq 'X'; 
          }
-        print $!objcolor._;
+        $!objcolor._;
+     }
+     method display_all_coordonnees {
+         print $!fill_color_attr;
+         for @!corner_points -> $pt {
+             $pt.fix;
+             printf("%d,%d",$pt.x,$pt.y);
+         }
+        $!objcolor._;
      }
     method draw {
         print $!border_color_attr;
         for @!lines -> $l {
             $l.draw;
         }
-        for @!mis_diagonales -> $line {
-            $line.draw;
+        #Les Mis
+        $!objcolor._;
+        $!objcolor.sequence8(LRED);
+        for @!mis_diagonales -> $l {
+            $l.draw;
+        }
+        $!objcolor.sequence8(LGREEN);
+        for @!complete_rectangles -> $l {
+            $l.draw;
         }
         $!objcolor._;
         gotoxy(1,1);
       }
 
     method fill {
-        for 1 ..  @!concaves_points.end  -> $n {
-           my $pt := @!concaves_points[$n];
-           next unless $pt.rect;
-           #print 'pt: ',$pt.str;
-           #sleep 2;
-           self.fill_rectangle($pt);
-           #print ',rectangle: ',$pt.rect.str if $pt.rect;
-           #print "\n";
-        }
-        self.display_concave_angles;
-        gotoxy(1,1);
-        print $!objcolor._;
     }
     method set_border_motif( Int $m) {
         $!border_motif = $m;
