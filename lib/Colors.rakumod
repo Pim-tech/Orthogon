@@ -121,7 +121,6 @@ class Color is export {
        $!current_mode = $mode if $mode.defined;
 
        my Str $seq = chr(27) ~ '[' ~  join(';', @seq) ~ 'm';
-       #print join(';' , @seq) ~ ' : ';
        return $print($seq);
     }
    
@@ -148,6 +147,7 @@ class Color is export {
         $!current_color_256 = $color;
         $!current_bgcolor_256 = $bgcolor;
         my Str $seq = chr(27) ~ '[' ~  join(';', @seq) ~ 'm';
+        #my Str $seq =  '[' ~  join(';', @seq) ~ 'm';
         return $print($seq);
     }
 
@@ -157,12 +157,6 @@ class Color is export {
        $chaine ~= ($fixed_width.defined or $spacing.defined) ?? self.fixed_width($s,$fixed_width,$spacing) !! $s;
        $chaine ~= self._(True) if $reset === True;
        return $print($chaine);
-    }
-    method say(Str $s,uInt8 $attr,$mode?,:$str=False,:$reset=True,:$fixed_width,:$spacing) {
-        my $print = ($str == False) ?? &print_the_string !! &return_the_string;
-        my $chaine = self.print($s,$attr,$mode,:$reset,str => True,:$fixed_width,:$spacing);
-        $chaine ~= "\n";
-        return $print($chaine);
     }
     multi method print256(Str $s,uInt16 $color,:$str=False,:$reset=True,:$fixed_width,:$spacing) {
         my $print = ($str == False) ?? &print_the_string !! &return_the_string;
@@ -178,13 +172,19 @@ class Color is export {
         $chaine ~= self._(True) if $reset === True;
         return $print($chaine);
     }
+    method say(Str $s,uInt8 $attr,$mode?,:$str=False,:$reset=True,:$fixed_width,:$spacing) {
+        my $print = ($str == False) ?? &print_the_string !! &return_the_string;
+        my $chaine = self.print($s,$attr,$mode,:$reset,str => True,:$fixed_width,:$spacing);
+        $chaine ~= "\n";
+        return $print($chaine);
+    }
     multi method say256(Str $s,uInt16 $attr,:$str=False,:$reset=True,:$fixed_width,:$spacing){
         my $print = ($str == False) ?? &print_the_string !! &return_the_string;
         my $chaine = self.print256($s,$attr,:$reset,str => True,:$fixed_width,:$spacing);
         $chaine ~= "\n";
         return $print($chaine);
     }
-    multi method say256(Str $s,uInt8 $bg,uInt8 $fg,:$str=False,:$reset=True,:$fixed_width,:$spacing){
+    multi method say256(Str $s,uInt8 $fg,uInt8 $bg,:$str=False,:$reset=True,:$fixed_width,:$spacing){
         my $print = ($str == False) ?? &print_the_string !! &return_the_string;
         my $chaine = self.print256($s,$fg,$bg,:$reset,str => True,:$fixed_width,:$spacing);
         $chaine ~= "\n";

@@ -4,6 +4,7 @@ use Colors :DEFAULT , :COLORS;
 use Misc;
 use HopcroftKarp;
 use Screen;
+use Rectangle;
 
 
 #We consider There are no origin or destination points or if you prefer, origin is always the lowest value and destination the highest.
@@ -11,137 +12,50 @@ use Screen;
 class Line is export {
     has Point $.a;
     has Point $.b;
+    has Point $!p;
     has Int $.int-motif;
+    has Int $!n;
     has Str $.motif; 
     has Str $.direction;
     has Point $.origin; 
     has Point $.destination;
     has Line $.prec is rw;
+    has int-list $.ia;
+    has int-list $.ib;
 
-    submethod BUILD(:$!a,:$!b,:$!origin,:$!destination,:$!int-motif,:$!motif){
-
-       ($!int-motif,$!motif) = DEFAULT_INT_MOTIF, DEFAULT_MOTIF   if ($!int-motif == -1 and $!motif eq '');
-        if $!motif eq '' {
-            $!motif = $!int-motif.chr;
-        } elsif $!int-motif == -1 {
-            my ($max,$len) = 1,$!motif.chars;
-            assert $len, &[==], $max;
-            $!int-motif = $!motif.ord;
-        } elsif $!int-motif.chr ne $!motif {
-            die "motif et int-motif spécifiés mais différents!";
-        }
-        if $!a.x ≠ $!b.x {
-           $!direction = 'h';
-        } else {
+    multi method new(int-list $ia,int-list $ib,Int :$int-motif,Str :$motif){
+        self.bless( :$ia, :$ib,:$int-motif,:$motif);
+    }
+    multi method new(Point $a,Point $b,Int :$int-motif,Str :$motif) {
+        self.bless(:$a,:$b,:$int-motif,:$motif);
+    }
+    multi method new(Point :$a,Point :$b,Int :$int-motif ,Str :$motif) {
+        self.bless(:$a,:$b,:$int-motif,:$motif);
+    }
+    submethod TWEAK() {
+        die "You may not give motif and int-motif together!" if $!int-motif and $!motif;
+        if not $!int-motif and not $!motif {
+           $!motif = DEFAULT_MOTIF; 
+        } elsif $!int-motif {
+           $!motif = $!int-motif.chr;
+        } 
+        if $!ia and $!ib {
+            $!a = Point.new($!ia);
+            $!b = Point.new($!ib);
+        } 
+        if $!a.x != $!b.x {
+            $!direction = 'h';
+            my ($ypoint1,$ypoint2) = $!a.y,$!b.y;
+            assert($ypoint1, &[==] , $ypoint2);
+            ($!a.x > $!b.x) ?? ($!origin := $!b; $!destination:= $!a) !! ($!origin := $!a; $!destination := $!b);
+        } elsif $!a.y != $!b.y {
             $!direction = 'v';
+            ($!a.y > $!b.y) ?? ($!origin := $!b; $!destination:= $!a) !! ($!origin := $!a; $!destination := $!b);
+        } else {
+           die "You may not have 2 identical points to build a Line." 
         }
-    }
-    multi sub bound_control(Point $a ,Point $b ) {
-       my Point ($origin,$destination);
-       if $a.x ≠ $b.x {
-           my ($ypoint1,$ypoint2) = $a.y,$b.y; 
-           assert($ypoint1 , &[==] ,$ypoint2);
-           ($a.x > $b.x) ?? ($origin := $b; $destination:=$a;)
-           !! ($origin:=$a;$destination:=$b);
-       } elsif $a.y ≠ $b.y {
-           ($a.y > $b.y) ?? ($origin:=$b;$destination:=$a;) 
-           !! ($origin:=$a;$destination:=$b);
-       } else { $origin:=$a;$destination:=$b;}
-       return $origin,$destination;
-    }
-    #Control limits and possibilities 
-    multi sub bound_control(int-list $a,int-list $b){
-        my Point ($pa,$pb,$origin,$destination);
+    } 
 
-        if  $a[0] ≠ $b[0] {
-            my ($ypoint1,$ypoint2) = $a[1],$b[1]; 
-            assert($ypoint1 , &[==] ,$ypoint2);
-            if $a[0] > $b[0] {
-                $pa := Point.new($b);
-                $pb := Point.new($a);
-                $origin := $pb;
-                $destination := $pa;
-            } else {
-                $pa := Point.new($a);
-                $pb := Point.new($b);
-                $origin := $pa;
-                $destination := $pb;
-            }
-        } elsif $a[1] ≠  $b[1] {
-            if $a[1] > $b[1] {
-                $pa := Point.new($b);
-                $pb := Point.new($a);
-                $origin := $pb;
-                $destination := $pa;
-            } else {
-                $pa := Point.new($a);
-                $pb := Point.new($b);
-                $origin := $pa;
-                $destination := $pb;
-            }
-        } else { 
-                $pa := Point.new($a);
-                $pb := Point.new($b);
-                $origin := $pa;
-                $destination := $pb;
- 
-        }
-
-        return $pa, $pb, $origin,$destination; 
-    }   
-    multi method new(int-list $ia,int-list $ib,:$int-motif? = -1,:$motif? = ''){
-        my Point ($a,$b,$origin,$destination) = bound_control($ia,$ib);
-        self.bless( :$a, :$b,:$origin,:$destination,:$int-motif,:$motif);
-    }
-    multi method new(Point $p,Int $n,$direction,:$int-motif?  = -1,:$motif?  = '') {
-        my Point ($a,$b,$origin,$destination);
-        if $direction eq 'v' {
-            if $n > 0  {
-                $a = Point.new($p.x,$p.y);
-                $b = Point.new($p.x,($p.y + $n));
-                $origin = $a;
-                $destination = $b;
-           } elsif $n < 0 {
-                $b = Point.new($p.x,$p.y);
-                $a = Point.new($p.x,($p.y + $n));
-                $origin = $b;
-                $destination = $a;
-           }
-        } elsif $direction eq 'h' {
-            if $n > 0 {
-                $a = Point.new(($p.x),$p.y);
-                $b = Point.new($p.x + $n ,$p.y);
-                $origin = $a;
-                $destination = $a;
-            } elsif $n < 0 {
-                $b = Point.new(($p.x),$p.y);
-                $a = Point.new($p.x + $n ,$p.y);
-                $origin = $b;
-                $destination = $a;
-            }
-       }
-        self.bless(:$a,:$b,:$origin,:$destination,:$direction,:$int-motif,:$motif);
-    }
-    multi method new(Point $a,Point $b,Int :$int-motif? = -1,Str :$motif? = '') {
-        my Point ($origin,$destination) = bound_control($a,$b);
-        self.bless(:$a,:$b,:$origin,:$destination,:$int-motif,:$motif);
-    }
-    multi method new(Point :$a,Point :$b,Int :$int-motif? = -1,Str :$motif? = '') {
-        my Point ($origin,$destination) = bound_control($a,$b);
-        self.bless(:$a,:$b,:$origin,:$destination,:$int-motif,:$motif);
-    }
-
-    method is_subset(Line $b --> Bool:D){
-        if $!direction eq 'h' {
-            return False if  $b.direction eq 'v';#Ce cas ne devrait pas arriver
-            return True if $!a.y == $b.a.y and ($!a.x ≤ $b.b.x and $!a.x ≥ $b.a.x) and ($!b.x ≥ $b.a.x  and $!b.x ≤ $b.b.x);
-            return False;
-        } elsif $!direction eq 'v' {
-            return False if $b.direction eq 'h';
-            return True if $!a.x == $b.a.x and ($!a.y ≤ $b.b.y and $!a.y ≥ $b.a.y ) and ($!b.y >= $b.a.y and $!b.y ≤ $b.b.y);
-            return False;
-        }
-    }
     method get_coords() {
         return $!a.x,$!a.y,$!b.x,$!b.y;
     }
@@ -149,6 +63,11 @@ class Line is export {
         return $!a.x.Str ~ ',' ~ $!a.y.Str ~ '/' ~ $!b.x.Str ~ ',' ~ $!b.y.Str;
     }
 
+    #Return True if the given point is into this Line
+    method has_point(Point $pt) {
+        return ( $pt.y == $!origin.y  and ( $pt.x >=  $!origin.x and $pt.x <= $!destination.x ) )  if $!direction eq 'h';
+        return ( $pt.x == $!origin.x  and ( $pt.y >= $!origin.y and $pt.y <= $!destination.y ) )  if $!direction eq 'v';
+    }
     method draw {
         my Int $n;
         my Str $s;
@@ -183,8 +102,9 @@ class Orthogone is export {
     #--------------
     has Int $!rotation;
     has ScreenBuffer $.scrn;
-
+    has @!rect;
     has $!log_fh;
+    has @!rect_index;
 
     submethod BUILD(:@!coordonnees,:$!int_border_motif,:$!border_motif) {
        ($!int_border_motif,$!border_motif) = DEFAULT_INT_MOTIF, DEFAULT_MOTIF   if ($!int_border_motif == -1 and $!border_motif eq '');
@@ -209,13 +129,17 @@ class Orthogone is export {
           my ($point,$prec_point) := @!corner_points[$n],@!corner_points[$n - 1];
           $!scrn.load_value($point);
           my $line := Line.new(a => $prec_point, b => $point,border_motif => $!border_motif);
-          given $line.direction {
-              when 'h' { $!scrn.load_value( Point.new($_,$line.origin.y , setflag => 'LINE')) for $line.origin.x + 1 .. $line.destination.x - 1 ; }
-              when 'v' {$!scrn.load_value( Point.new($line.origin.x,$_, setflag => 'LINE') ) for $line.origin.y + 1 .. $line.destination.y - 1 ;}
-          }
           push @!lines,$line; 
           @!lines.tail.prec = @!lines[*-2];
       }
+      push @!lines, Line.new(a => @!corner_points.tail,b => @!corner_points[0],border_motif => $!border_motif);
+      for @!lines -> $l {
+          given $l.direction {
+              when 'h' { $!scrn.load_value( Point.new($_,$l.origin.y , setflag => 'LINE')) for $l.origin.x + 1 .. $l.destination.x - 1 ; }
+              when 'v' {$!scrn.load_value( Point.new($l.origin.x,$_, setflag => 'LINE') ) for $l.origin.y + 1 .. $l.destination.y - 1 ;}
+          }
+      }
+      @!lines.tail.prec = @!lines[*-2];
       $!scrn.make_indices();
       $!log_fh = open :w, 'char_cons.log';
       self!concave_angles();
@@ -225,14 +149,15 @@ class Orthogone is export {
     }
 
     multi method new(**@coordonnees where all(@coordonnees>>.elems) == 2,:$int_border_motif? = -1 ,:$border_motif? = '' ) {
-        my @pts;# = self.control_and_get(@coordonnees);
         self.bless(coordonnees => @coordonnees,:$int_border_motif,:$border_motif);
     }
 
-    method control_and_get(@cord,--> Array) {
+    method control_and_get(@cord --> Array) {
         my Point @points;
-        my Point $plast := Point.new( @cord[0][0],@cord[0][1]);
-        @points.push( $plast );
+        my Point $first = Point.new( @cord[0][0],@cord[0][1]);
+        my Point $plast := $first;
+      
+        @points.push( $first );
         
         for 1 .. @cord.end -> $n {
             my ($xp,$yp) = @cord[$n - 1][0],@cord[$n - 1][1];
@@ -248,6 +173,10 @@ class Orthogone is export {
             @points.tail.prev.next = @points.tail;
             $plast:=@points.tail;
         }
+        $first.prev = @points.tail;
+        $first.next = @points[1];
+        @points.tail.next = $first; 
+        
     CATCH {
        default {
                 say "Exception in !!! Polygone : " ~ $_.payload;
@@ -255,6 +184,7 @@ class Orthogone is export {
          };
         return @points;
     }
+    #TODO:
     method !get_direction(Line $l --> Str) {
         given $l.direction {
             when 'h' {
@@ -385,8 +315,11 @@ class Orthogone is export {
                   my ($ai,$bi,$ci) = $a.Int,$b.Int,$c.Int;
                   given $type {
                       when 'horiz' { 
-                          $!scrn.get_value($bi,$ai).setflag('MIS'); 
-                          $!scrn.get_value($ci,$ai).setflag('MIS');
+                          my Point ($p1,$p2) = $!scrn.get_value($bi,$ai),$!scrn.get_value($ci,$ai);
+                          $p1.setflag('MIS'); 
+                          $p2.setflag('MIS');
+                          $p2.mis = $p1;
+                          $p1.mis = $p2;
                           my $l = Line.new( ($bi  ,$ai ),($ci ,$ai) , motif => '-' );
                           for $bi + 1 .. $ci - 1 -> $x {
                               $!scrn.load_value($x,$ai,Point.new($x,$ai,setflag =>'MIS'));
@@ -394,8 +327,11 @@ class Orthogone is export {
                           push @!mis_diagonales, $l; 
                       }
                       when 'vertic' {
-                          $!scrn.get_value($ai,$bi).setflag('MIS');
-                          $!scrn.get_value($ai,$ci).setflag('MIS');
+                          my Point ($p1,$p2) = $!scrn.get_value($ai,$bi),$!scrn.get_value($ai,$ci);
+                          $p1.setflag('MIS');
+                          $p2.setflag('MIS');
+                          $p2.mis = $p1;
+                          $p1.mis = $p2;
                           for $bi + 1 .. $ci - 1 -> $y {
                               $!scrn.load_value($ai,$y,Point.new($ai,$y,setflag => 'MIS'));
                           }
@@ -410,20 +346,24 @@ class Orthogone is export {
       }
     method !create_rectangles {
         for @!concaves_points -> $pt {
-            #next if $pt.mis === True; 
-            # say $pt.hasflag('MIS');
             next if $pt.hasflag('MIS');
             $pt.setflag('RECTANGLE');
             given $pt.direction { 
-                when / (^ right) | (left $) /  { 
+                when / (^ right) | (left $) / { 
                     my Point $other_point := $!scrn.for_xrange_aty($pt.y,$pt.x); 
                     $other_point.setflag('RECTANGLE');
+                    $other_point.rect = $pt;
+                    $other_point.prev = $pt;
+                    $other_point.next = $pt;
                     $pt.rect = $other_point;
                     push @!complete_rectangles, Line.new($pt,$other_point,motif => '*');
                 }
-                when / (^ left ) | (right $) /  {
+                when / (^ left ) | (right $) / {
                     my Point $other_point := $!scrn.for_xrange_aty($pt.y,$pt.x,sens => -1);
                     $other_point.setflag('RECTANGLE');
+                    $other_point.rect =  $pt;
+                    $other_point.prev = $pt;
+                    $other_point.next = $pt;
                     $pt.rect = $other_point;
                     push @!complete_rectangles, Line.new($pt,$other_point,motif => '∘');
                 }
@@ -433,74 +373,91 @@ class Orthogone is export {
             }
         }
     }
-    multi method rectangle(int-list $a, int-list $b,:$motif=' ',:$color=BRED){
-        my Int ($x1,$y1,$x2,$y2) = ( @$a,@$b ).flat;
-        $!objcolor.sequence8($color);
-        for $y1 .. $y2 -> $y {
-            Line.new( ($x1,$y), ($x2,$y),:$motif).draw;
-        }
-        $!objcolor._;
-    }
-    multi method rectangle(Point $a,Point $b,:$motif=' ',:$color=BRED){
-        self.rectangle( ($a.x,$a.y), ($b.x,$b.y), :$motif,:$color);
-    }
-    multi method fill_rectangle(Point $pt, :$motif = ' ', :$color = BRED) {
-        my ($xmirror,$ymirror);
-        my Point $mirror;
-        if $pt.y == $pt.rect.y {
-            if $pt.prev.y != $pt.y {
-                $ymirror = $pt.prev.y;
-                $xmirror = $pt.rect.x;
-            }elsif $pt.next.y ≠ $pt.y {
-                $ymirror = $pt.next.y;
-                $xmirror = $pt.rect.x; 
-            } 
-            
-            if (my $mirror = $!scrn.get_value($xmirror,$ymirror)) {
-                $!log_fh.say('pt: ',$pt.str,', mirror: ',$xmirror,',',$ymirror,', direction: ',$pt.direction,', prec:',$pt.prev.str, ': ', $pt.prev.direction);
-                self.fill_rectangle($pt,$mirror);
+
+    multi method pointsAreLine(Point $p1,Point $p2 --> Bool ) {
+        die 'p1 not defined' unless $p1.defined;
+        my $prev = $p1.prev;
+        my $next = $p1.next;
+        die 'p2 not defined' unless $p2.defined;
+
+        if ($prev.defined  and $next.defined ) and  ($prev == $p2   ||  $next == $p2) {
+            return True;
+        } elsif $p1.hasflag('CONCAVE') {
+            if defined $p1.rect and $p2  ==  $p1.rect {
+                return  True;
             }
-            #self.rectangle($mirror,$pt);
-        } 
+            elsif $p1.hasflag('MIS') {
+               return $p2 == $p1.mis ;
+            }
+        } elsif $p2.hasflag('CONCAVE') and defined $p2.rect {
+            return $p1 == $p2.rect;
+        }
+        return False;
+
+    }
+    multi method pointsAreLine(int-list $a,int-list $b --> Bool){
+           my $p1 = $!scrn.get_value($a[0],$a[1]);
+           die 'Point ', $p1.str, ' not found.' unless defined $p1;
+           my $p2 = $!scrn.get_value($b[0],$b[1]);
+           die 'Point ', $p2.str, ' not found.' unless defined $p2;
+           return self.pointsAreLine($p1,$p2);
+    }
+    
+    multi method pointsAreSegment(Point $p1,Point $p2 --> Bool) {
+      die 'p1 not defined' unless $p1.defined;
+      die 'p2 not defined' unless $p2.defined;
+
+      my ($which,$xv,$yv,$other);
+      if $p1.x == $p2.x {
+          $other = $p1.x;
+          $which = 'y';  $yv = 'v'; $xv = 'other';
+      } elsif $p1.y == $p2.y {
+          $other = $p1.y;
+          $which = 'x'; $yv = '$p1.y'; $xv = 'other';
+      }
+      else {
+          die 'p1 and p2 are not on the same axe.';
+      }
+      if $p1.hasflag('RECTANGLE') and $p2.hasflag('RECTANGLE') {
+          for $p1."$which"()+1 .. $p2."$which"()-1  -> $v {
+              my $pt = $!scrn.get_value($::($xv),$::($yv));
+              return False unless defined $pt;
+              return False if $pt.hasflag('RECTANGLE');
+              return False if $pt.hasflag('CONVEXE');
+          }
+          return True;
+      }
+
+      return False;
+    }
+    multi method pointsAreSegment(int-list $a,int-list $b --> Bool){
+           my $p1 = $!scrn.get_value($a[0],$a[1]);
+           die 'Point ', $p1.str, ' not found.' unless defined $p1;
+           my $p2 = $!scrn.get_value($b[0],$b[1]);
+           die 'Point ', $p2.str, ' not found.' unless defined $p2;
+           return self.pointsAreSegment($p1,$p2);
     }
 
-    multi method fill_rectangle(Point $a,Point $b,:$motif='O',:$color=LWHITE+BRED){
-        my Int ($x1,$y1,$x2,$y2) = $a.x, $a.y,$b.x,$b.y;
-        ($x1,$x2) = ($x1,$x2).sort;
-        ($y1,$y2) = ($y1,$y2).sort;
-        $x1++;
-        $x2--;
-        $y1++;
-        $y2--;
-        self.rectangle( ($x1,$y1) , ($x2,$y2), :$motif,:$color);
+
+
+    
+    method display_concave_angles {
+        print $!fill_color_attr;
+        for @!concaves_points -> $pt {
+            $pt.fix;
+            #print( $pt.direction );
+            printf("%d,%d",$pt.x,$pt.y)# if $pt.direction eq 'X'; 
+        }
+       $!objcolor._;
     }
-    multi method fill_rectangle(int-list $a,int-list $b, :$motif = 'I',:$color = LWHITE+BRED){
-        my Int ($x1,$y1,$x2,$y2) = (@$a,@$b).flat;
-        ($x1,$x2) = ($x1,$x2).sort;
-        ($y1,$y2) = ($y1,$y2).sort;
-        $x1++;
-        $x2--;
-        $y1++;
-        $y2--;
-        self.rectangle( ($x1,$y1) , ($x2,$y2), :$motif,:$color);
+    method display_all_coordonnees {
+        print $!fill_color_attr;
+        for @!corner_points -> $pt {
+            $pt.fix;
+            printf("%d,%d",$pt.x,$pt.y);
+       }
+       $!objcolor._;
     }
-     method display_concave_angles {
-         print $!fill_color_attr;
-         for @!concaves_points -> $pt {
-             $pt.fix;
-             #print( $pt.direction );
-             printf("%d,%d",$pt.x,$pt.y)# if $pt.direction eq 'X'; 
-         }
-        $!objcolor._;
-     }
-     method display_all_coordonnees {
-         print $!fill_color_attr;
-         for @!corner_points -> $pt {
-             $pt.fix;
-             printf("%d,%d",$pt.x,$pt.y);
-         }
-        $!objcolor._;
-     }
     method draw {
         print $!border_color_attr;
         for @!lines -> $l {
@@ -516,14 +473,142 @@ class Orthogone is export {
         for @!complete_rectangles -> $l {
             $l.draw;
         }
+        self.display_all_coordonnees;
+
         $!objcolor._;
         gotoxy(1,1);
       }
 
-    method fill {
+    method index_rectangle(){
+        for @!complete_rectangles -> $l {
+            push @!rect_index[$l.b.x - 1 ] , $l.b.y;
+        }
     }
+    method split_vline(Line $vline,@lines) {
+        return False if  $vline.direction ne 'v';
+        my @lst = | @!rect_index[$vline.a.x - 1].grep({$_ > $vline.origin.y && $_ < $vline.destination.y }) if @!rect_index[$vline.a.x - 1];
+        return False unless @lst;
+        @lst .= sort;
+        @lst .= unique;
+        unshift @lst, $vline.origin.y;
+        push @lst, $vline.destination.y;
+        for @lst.kv -> $k,$v {
+            push @lines, Line.new( ($vline.origin.x,@lst[$k - 1]) , ($vline.origin.x,$v), motif => '+' ) if $k > 0;
+        }
+        return True;
+    }
+
+    #Vérifie si le point est une ouverture ou une fermeture horizontale
+    method open_or_close(Point $pt --> Str){
+        #Si le point n'a pas de prev ET de next 'none' sera renvoyé
+        return 'none' unless ($pt.prev and $pt.next);
+        my Point $op; #Le point recherché.
+        #Si 
+        if $pt.hasflag('RECTANGLE') {
+            if $pt.hasflag('CONCAVE') {
+               $op := $pt.rect;
+            } else {
+               $op := $pt.rect;
+            }
+        } elsif $pt.prev.y == $pt.y {
+            $op := $pt.prev;
+        } elsif $pt.next.y == $pt.y {
+            $op := $pt.next;
+        }
+        return ($op.x >  $pt.x) ?? 'OPEN' !! 'CLOSED';
+    }
+    
+    method agregate(Line $vmis_or_part) {
+
+
+    }
+
+    method fill {
+        
+        my Point @allpoints;
+        my (@xindex,@yindex);
+        #Met les points des lignes de projections dans allpoints
+        push @allpoints, .b for @!complete_rectangles;
+        #Y ajoute tous les points d'angles
+        append @allpoints,@!corner_points;
+        #Les trie dans l'ordre x,y
+        @allpoints .= sort: {.x,.y};
+        #Ecrit les points dans le log
+        for @allpoints -> $pt {
+            $!log_fh.say($pt.str);
+        }
+        #Déclare un hash
+        my %h;
+        say '-' x 20 ~ ' Points de fermeture ' ~ '-' x 20 ;
+        #Pour chaque point :  l'ordre, le point
+        for @allpoints.kv -> $n,$pt {
+            #$!log_fh.say($pt.str,' => ',self.open_or_close($pt));
+            #Si l'ordre est > 0
+            if $n > 0 {
+                #Saute un tour si l'axe des x est différent du point précédent
+                next if $pt.x ≠ @allpoints[$n - 1].x;
+                #Fabrique la clé y_précédant_y.
+                my $key = @allpoints[$n - 1].y.Str ~ '_' ~ $pt.y.Str;
+                given self.open_or_close($pt) {
+                    when 'OPEN' { # Si le point est ouvrant
+                        %h{$key}{$pt.x} = 1; #Rempli le hash avec la clé, puis x
+                    }
+                    when 'CLOSED' {
+                        if %h.EXISTS-KEY($key) { #Si la clé existe
+                            #say $key, ' ',%h{$key}.kv[0] , ' : ', $pt.x; #Affiche : le clé, la valeur, et x;
+                            my ($y1,$y2) = @allpoints[$n - 1].y + 1,$pt.y;
+                            my ($x1,$x2) = %h{$key}.kv[0].Int + 1, $pt.x - 1;
+                            my ($hlen,$vlen) = $x2 - $x1, $y2 - $y1;
+                            #printf("(%d,%d)=>(%d,%d)\n",$x1 - 1 ,$x2 + 1,$y1 - 1,$y2);
+                            printf("(%d,%d)=>(%d,%d)\n",  $y1 - 1,$y2,    $x1 - 1 ,$x2 + 1);
+                            #Rectangle.new($x1,$y1,$hlen,$vlen,motif => 'K').draw;
+                            %h{$key}:delete; #Supprime la clé
+                        }
+
+                    }
+                }
+
+                #$!log_fh.say($key);
+            }
+        }
+
+        say '-' x 20 ~ ' Ce qui reste dans le hash, qui n\'a pas été fermé ' ~ '-' x 20 ;
+
+        for %h.kv -> $k,$v {
+            say $k , ' => ',$v ;
+        }
+
+#        my %h;
+#        for (@!corner_points,@allpoints).flat.sort: {.x,.y } -> $pt {
+#            $pt.setflag(self.open_or_close($pt));
+#            $!log_fh.say($pt.str,' => ',self.open_or_close($pt));
+#        } 
+
+
+       exit; 
+        for @allpoints -> $pt {
+           push @xindex[$pt.x - 1],$pt.y;
+           push @yindex[$pt.y - 1],$pt.x;
+        }
+        for @xindex -> $one {
+            if $one {
+                @$one .= sort if $one;
+                @$one .= unique;
+            }
+        }
+        $!log_fh.say('xindexes:');
+        for @xindex -> $l {
+            $!log_fh.say($l) if $l;
+        }
+        $!log_fh.say('yindexes:');
+        for @yindex -> $l {
+            $!log_fh.say($l) if $l;
+        }
+    }
+
     method set_border_motif( Int $m) {
         $!border_motif = $m;
     }
+
 }
 

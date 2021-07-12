@@ -90,7 +90,7 @@ multi move_up_and_left(Bool $rstr=False) {
 }
 multi move_up_and_left(Int $up,Int $left,Bool $rstr=False){
     my $print = ($rstr == False) ?? &printf !! &sprintf;
-    return $print( STARTSEQ ~ "%dB" ~ STARTSEQ ~ "%dD",$up,$left);
+    return $print( STARTSEQ ~ "%dA" ~ STARTSEQ ~ "%dD",$up,$left);
 }
 
 multi move_down_and_left(Bool $rstr=False) {
